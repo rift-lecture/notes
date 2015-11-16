@@ -1,1 +1,108 @@
-\chapter{The rift Language}
+\chapter{The \rift Language}
+
+As a running example we will write a complete compiler for a dynamic language called \rift, a minimalistic variation on the R language. \Rift was created for the purpose of this lecture, thus features as few language features as possible while still providing many of the vast challenges a full blown dynamic language would provide to the implementor.
+
+\Rift -- like its inspiration R -- is a vectorized language. As such it does not have any scalar types, \ie the number 1 is represented a numerical vector which happens to be of length one.
+
+As far as primitive types go, the language provides only 3 thereof:
+\begin{itemize}
+\item Double precision numbers
+\item Eight bit characters
+\item Functions
+\end{itemize}
+Of those the first two are vectorized; the function is a first class value in the language but exists only as a scalar.
+
+\section{Tutorial}
+
+The following snippets contain fully functional \rift code intended to provide a gentle introduction how the language is supposed to work.
+
+As stated before there are two basic data types,
+
+\begin{lstlisting}[language=rift]
+# First: doubles
+1.2
+1.0 + 1
+
+# to be precisely vectors of doubles
+c(1, 2, 3)
+
+# since even scalars exist as vectors.
+1[0]
+c(1, c(2, 3))
+
+# Second: vectors of characters represented as strings.
+"hi"
+c("hi ", "friend")
+
+# We have operations to ask the type of values and their length.
+type(v)
+type(str)
+type(1)
+length(diag)
+length(1)
+length(str)
+
+# And of course variables.
+v <- 1
+s <- "s"
+
+# But types do not mix, and we don't have casts.
+1 + "two"
+c(1, "a")
+\end{lstlisting}
+
+A third data type is the function. Functions are defined by the $function$ keyword and are expressions themselves. They can be assigned to variables or passed as arguments.
+
+\begin{lstlisting}[language=rift]
+# Functions can be created as exppressions and bound to names.
+id <- function( x ) { x }
+id
+id(1)
+id("hi")
+
+# Function are higher order.
+one <- function() { 1 }
+two <- function() { 2 }
+
+ho <- function(a,b) {
+  if ( a() > b() ) {
+    a()
+  } else {
+    b()
+  }
+}
+ho( one, two )
+ho( two, one )
+
+# Functions are lexically scoped.
+builder <- function() {
+  x <- 0
+  function() {
+    x[0] <- x[0] + 1
+  }
+}
+counter <- builder()
+counter()
+counter()
+
+# Values are passed by reference.
+x <- c(1, 2)
+add1 <- function ( v ) {
+  v[0] <- v[0] + 1
+}
+add1(x)
+x
+\end{lstlisting}
+
+Note that functions are not defined with an unique name. They are just assigned to normal variables. To call a function its definition will thus need to be looked up at runtime.
+
+Additionally as an additional source of evilness towards the implementor the language also features a dynamic eval function to run arbitrary code.
+
+\begin{lstlisting}[language=rift]
+eval("x <- 1")
+f <- function() {
+  z <- 42
+  eval("x <- z")
+}
+f()
+\end{lstlisting}

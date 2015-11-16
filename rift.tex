@@ -1,5 +1,6 @@
 \documentclass[twoside]{scrreprt}
 
+\usepackage[utf8]{inputenc}
 \usepackage{graphicx}
 \graphicspath{{images/}}
 \usepackage[pdftex,colorlinks=true,pdfstartview=FitV,
@@ -128,7 +129,11 @@
 
 \newenvironment{bottompar}{\par\vspace*{\fill}}{\clearpage}
 
-\newcommand{\thetitle}{RIFT}
+\newcommand{\rift}{rift}
+\newcommand{\Rift}{Rift}
+\newcommand{\RIFT}{RIFT}
+
+\newcommand{\thetitle}{\RIFT}
 \newcommand{\thesubtitle}{LLVM based JIT compiler}
 \newcommand{\theauthor}{We}
 \newcommand{\theurl}{\url{http://github.com/rift-lecture}}
@@ -145,7 +150,6 @@ version={4.0},
 
 % ========================================
 % Metadata
-
 
 \begin{document}
 
