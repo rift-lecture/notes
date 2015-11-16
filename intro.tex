@@ -1,0 +1,35 @@
+\chapter*{Introduction}
+
+This is just a test for our code formatting, first in \autoref{lst:sample-cpp} we see some C++ code.
+
+\begin{lstlisting}[language=cpp, caption={A sample C++ snippet}, label={lst:sample-cpp}]
+#include "runtime.h"
+
+namespace rift {
+
+/** The constant pool holds symbols, strings and all compiled functions.*/
+class Pool {
+
+public:
+    /** Returns the number of compiled functions.  */
+    static unsigned functionsCount() {
+        return f_.size();
+    }
+
+    /** Returns function at index.   */
+    static RFun * getFunction(int index) {
+        return f_[index];
+    }
+\end{lstlisting}
+
+And then finally some in \autoref{lst:sample-rift} rift code:
+
+\begin{lstlisting}[language=rift, caption={A sample rift snippet}, label={lst:sample-rift}]
+fib <- fib(n) {
+  if(n < 2) {
+    1
+  } else {
+    fib(n-2) + fib(n-1)
+  }
+}
+\end{lstlisting}
