@@ -31,7 +31,7 @@ The first allocation on line 2 is trivial to translate, since it conveniently ma
 
 A possible choice for an activation frame of aFunction from \autoref{lst:mem-cpp} is given in \autoref{fig:runtime-stack}. Assuming the variable $i$ had to be stored permanently at some point we can see the value of i and the contents of the vector $b$ stored inside the current frame. Note that to release all the memory upon returning from the function it suffices to adjust the stack pointer (SP). This allows us to reuse the memory without further overhead. Finally the variable $c$ is not stored on the stack, rather we only keep a pointer (denoted $*c$) and store the actual value outside the stack. We call this \emph{heap allocation}. Storage allocated on the heap is not reclaimed by returning from the function. This allows us to use the value in a higher up, \ie earlier frame; or as we can see in \autoref{lst:mem-cpp} on line 5 to assign it to a global value. In C++ heap objects are not automatically reclaimed and the programmer is responsible to manually delete the object when its no longer in use.
 
-It might seem that we could write most programs to just use heap allocated memory and thereby avoid the cognitive overhead of requesting and releasing memory. In practice most programming languages would want to provide heap storage to the user. In particular stack allocated memory is
+It might seem that we could write most programs to just use stack allocated memory and thereby avoid the cognitive overhead of requesting and releasing memory. In practice most programming languages would want to provide heap storage to the user. In particular stack allocated memory is
 
 \begin{description}
   \item[limited] The runtime stack needs to be a linear address space which is more expensive to provide than a segmented address spaces.
@@ -56,7 +56,7 @@ function(a) {
 \label{fig:rift_stack}
 \end{figure}
 
-Unlike in the C++ case all \rift values are allocated on the stack. This releases the programmer from the cognitive burden to figure out where to put its values. In the spirit of a dynamic language he can pass any value to any function and of course also return it. The runtime stack is only used to keep track of environments, which are the runtime representation of \rift stack frames.
+Unlike in the C++ case all \rift values are allocated implicitly on the heap. This releases the programmer from the cognitive burden to figure out where to put its values. In the spirit of a dynamic language he can pass any value to any function and of course also return it. The runtime stack is only used to keep track of environments, which are the runtime representation of \rift stack frames.
 
 Of course this creates a problem. As demonstration we run a very simple \rift program given in \autoref{lst:rift-mem-usg}. 
 
