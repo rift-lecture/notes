@@ -80,7 +80,7 @@ valgrind --tool=massif ./rift loop.ri
 
 \begin{figure}[h]
 \centering
-\includegraphics[width=1\textwidth, height=1\textwidth]{massif-blowup}
+\includegraphics[width=1\textwidth]{massif-blowup}
 \caption{Memory consumption of a \rift program given in \autoref{lst:rift-mem-usg} without any memory management enabled.}
 \label{fig:massif-blowup}
 \end{figure}
@@ -163,3 +163,126 @@ As discussed before, many temporary pointers exist solely on the runtime stack. 
 \section{\Rift implementation}
 
 Our \rift implementations features a naive mark and sweep GC using conservative stack scanning. Although LLVM would provide infrastructure to generate precise stack maps we refrained from using it. First of all it would be too complex to fit into the constraints of the lecture. Second the GC support in LLVM has yet to mature to be reasonably usable. Therefore \rift features a conservative stack scan.
+
+In gc.h we find the high level marking algorithm implemented in \autoref{lst:gc1}. The actual marking depends of course on the type of object. As we can see in \autoref{lst:gc2} of the RVal types only the function contains further references. E.g. the double vector only contains data values. In the case of the environment we have to follow all the stored bindings.
+
+\begin{lstlisting}[language=cpp, caption={Generic marking}, label={lst:gc1}]
+// Generic mark algorithm is to check if an object was marked before. Iff
+// not we will mark it first (to deal with cycles) and then delegate to the
+// user defined markImpl<T> for the specific type to scan its child nodes.
+template <typename T>
+void mark(T * obj, NodeIndex & i) {
+    auto & a = arena<T>();
+    if (!a.isMarked(i)) {
+        a.setMark(i);
+        markImpl<T>(obj);
+    }
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=cpp, caption={Marking for all object types.}, label={lst:gc2}]
+template<>
+void GarbageCollector::markImpl<RVal>(RVal * value) {
+    if (value->type == RVal::Type::Function) {
+        mark(value->f->env);
+    }   
+    // Leaf node, nothing to do
+};
+
+template<>
+void GarbageCollector::markImpl<Environment>(Environment * env) {
+    for (int i = 0; i < env->size; ++i) {
+        mark(env->bindings[i].value);
+    }   
+    if (env->parent)
+        mark(env->parent);
+}
+\end{lstlisting}
+
+The conservative stack scan is shown in \autoref{lst:gc3}. We use a bit of inline assembly on line 4 to make sure all register content id spilled to the runtime stack where our stack scan can pick it up. We see on line 27 that we call $markMaybe$ which is a special mark function which first validates if the pointer is valid.
+
+\begin{lstlisting}[language=cpp, caption={Conservative stack scan.}, label={lst:gc3}]
+void scanStack() {
+    // Clobber all registers:
+    // -> forces all variables currently hold in registers to be spilled
+    //    to the stack where our stackScan can find them.
+    __asm__ __volatile__ ( "nop" : :
+            : "%rax", "%rbx", "%rcx", "%rdx", "%rsi", "%rdi",
+            "%r8", "%r9", "%r10", "%r11", "%r12",
+            "%r13", "%r14", "%r15");
+    _scanStack();
+}
+
+// Performance Hack: we assume the first page of memory not to contain any
+// heap pointers. Maybe there is also a reasonable upper limit?
+bool maybePointer(void* p) {
+    return p > (void*)4096;
+}
+
+const void * BOTTOM_OF_STACK;
+
+// The stack scan traverses the memory of the C stack and looks at every
+// possible stack slot. If we find a valid heap pointer we mark the
+// object as well as all objects reachable through it as live.
+void __attribute__ ((noinline)) _scanStack() {
+    void ** p = (void**)__builtin_frame_address(0);
+    while (p < BOTTOM_OF_STACK) {
+        if (maybePointer(*p))
+            markMaybe(*p);
+        p++;
+    }
+}
+\end{lstlisting}
+
+To make sure we can identify valid pointers all objects are allocated in bulk pages (see \autoref{lst:gc5}). The pages are indexed in a so called Arena, which we can query to find out if a pointer is valid. As shown in \autoref{lst:gc4} the Arena and the pages together have enough information about all objects in the system, that we can answer whether a random integer number corresponds to a valid pointer.
+
+\begin{lstlisting}[language=cpp, caption={Finding out if a random value is a valid pointer.}, label={lst:gc4}]
+NodeIndex Arena::findNode(void* ptr) {
+    uintptr_t addr = reinterpret_cast<uintptr_t>(ptr);
+    
+    // Simple performance hack, which allows us to quickly discard
+    // implausible pointers without iterating the page list.
+    if (addr < minAddr || addr > maxAddr)
+        return NodeIndex::nodeNotFound();
+
+    for (index_t i = 0; i < page.size(); i++) {
+        if (page[i]->isValidObj(ptr)) {
+            return NodeIndex(i, page[i]->getIndex(ptr));
+        }
+    }
+
+    return NodeIndex::nodeNotFound();
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=cpp, caption={Overriding the new oparator.}, label={lst:gc5}]
+template <typename OBJECT>
+struct HeapObject {
+    // Overriding new makes sure memory is allocated through the GC
+    static void* operator new(size_t sz) {
+        return gc::GarbageCollector::alloc<OBJECT>();
+    }
+
+    void operator delete(void*) = delete;
+};
+
+template <typename T>
+void* doAlloc() {
+    auto res = arena<T>().alloc();
+    if (!res) {
+        doGc();
+        res = arena<T>().alloc();
+    }
+    return res;
+}
+\end{lstlisting}
+
+After adding the GC to the system we revisit the heap usage of our loop.ri program from \autoref{lst:rift-mem-usg} and as we can see in \autoref{fig:massif-gc} the memory consumption stays linear, as it would be expected from this artifact.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=1\textwidth]{massif-gc}
+\caption{Memory consumption of a \rift program given in \autoref{lst:rift-mem-usg} with GC enabled.}
+\label{fig:massif-gc}
+\end{figure}
+
