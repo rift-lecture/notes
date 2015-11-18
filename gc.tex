@@ -139,9 +139,27 @@ In the context of the GC we call the running program the mutator, since it is mu
 
 \subsection{Strategies}
 
-Finally we are ready to look at two representative GC algorithms.
+Finally we are ready to look at two representative GC algorithms. Our main focus will be on the classical \emph{mark and sweep} algorithm. We will also briefly look at \emph{mark and copy}.
 
-\subsection{Stack Pointers}
-\subsection{Conservative Marking}
+\subsubsection{Mark and Sweep}
+
+A mark and sweep GC has two phases. First it marks every reachable object on the heap. Secondly it sweeps the whole heap and reclaims all non-marked memory. The marking phase is recursively visiting every object in the heap. The GC needs to have precise knowledge of the object layout. Starting from the root set it will recursively visit all reachable references. Marking can be implemented in several ways. In the simplest form every object has some common metadata in the beginning, called an object header, where at least one bit is reserved to store the marking information. The sweeping phase will scan through all reserved memory pages and record all continuous blocks of free space by \eg storing them in a freelist. 
+
+\subsubsection{Mark and Copy}
+
+A mark and copy GC will move live objects to achieve a more compact heap layout and provide faster allocation. In its simplest form a so called semispace collector will divide the heap into two halves. Allocation happens exclusively in one of the two halves. When it is full the GC will first perform a normal marking phase, like in the mark and sweep scenario described before. Subsequently all live objects will be copied to the second half. We call the old half the fromspace and the other half the tospace. The copying will result in all live objects to be compactly aligned at the beginning of tospace. After copying the role of to- and fromspace swap. New objects are allocated in the (continuous) free part of the former tospace.
+
+Copying garbage collectors move around objects on the heap. They are therefore required to fix all references pointing to the moved objects, thus need even more precise information on all pointer locations in the system. Often the cost of copying can be amortized by faster allocation, reduced fragmentation and better locality of the heap.
+
+\subsection{Stack Scanning}
+
+As discussed before, many temporary pointers exist solely on the runtime stack. Therefore a GC must be able to scan the runtime stack and discover all the pointers. There are generally two strategies:
+
+\begin{description}
+  \item[Precise Stackmaps] For every callsite the compiler produces a precise inventory of all pointer locations. Such a data structure is called stackmap. When unrolling the runtime stack frame by frame the GC queries the stackmap for the current program counter value to know which slots in the activation frame contain a valid object pointer.
+  \item[Conservative Marking] An alternative solution without requiring compiler support is to treat every value on the stack as a potential pointer using a conservative marking scheme. The disadvantages of this approach are that we might consider random values to be valid pointers. Also for every pointer candidate we have to be able to answer if it conceivably points to a valid object or not, before we can mark it. On the other hand we do not place any restrictions on the stack layout and need no additional support from the compiler.  
+\end{description}
 
 \section{\Rift implementation}
+
+Our \rift implementations features a naive mark and sweep GC using conservative stack scanning. Although LLVM would provide infrastructure to generate precise stack maps we refrained from using it. First of all it would be too complex to fit into the constraints of the lecture. Second the GC support in LLVM has yet to mature to be reasonably usable. Therefore \rift features a conservative stack scan.
